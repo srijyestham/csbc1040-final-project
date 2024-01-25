@@ -1,0 +1,53 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "finally" ]
+  pull_request:
+    branches: [ "finally" ]
+
+env:
+  SERVICE: rap
+  REGION: us-east4
+  PROJECT_ID: finalproject-412305
+  IMAGE_NAME: acschandra/finalproject
+  VERSION_NUMBER: 1
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Login Dockerhub
+        env:
+          DOCKER_USERNAME: ${{secrets.DOCKER_REGISTRY_USERNAME}}
+          DOCKER_PASSWORD: ${{secrets.DOCKER_REGISTRY_PASSWORD}}
+        run: docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+
+      - name: Build the Docker image
+        run: |
+          BUILD_NAME_WITH_DOT="${{ env.IMAGE_NAME }}:${{ env.VERSION_NUMBER }} ."
+          echo "BUILD_NAME_WITH_DOT : $BUILD_NAME_WITH_DOT"
+          docker build -t $BUILD_NAME_WITH_DOT
+      - name: Push to dockerhub
+        run: |
+          BUILD_NAME_WITH_LATEST="${{ env.IMAGE_NAME }}:${{ env.VERSION_NUMBER }}"
+          echo "BUILD_NAME_WITH_LATEST : BUILD_NAME_WITH_LATEST"
+          docker push $BUILD_NAME_WITH_LATEST
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v1
+        with:
+          service: ${{ env.SERVICE }}
+          region: ${{ env.REGION }}
+          # NOTE: If required, update to the appropriate source folder
+          # source: ./
+          image: ${{ env.IMAGE_NAME }}:${{ env.VERSION_NUMBER }}
+
+        # If required, use the Cloud Run url output in later steps
+      - name: Show Output
+        run: echo ${{ steps.deploy.outputs.url }}
